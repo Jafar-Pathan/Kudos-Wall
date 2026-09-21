@@ -1,0 +1,12 @@
+------------------------------------------------------------
+[DEV EMAIL SIMULATION] EMAIL VERIFICATION SIMULATION
+To: reviewer-demo@example.com
+Action Link: http://localhost:3000/verify-email?token=abcdef123456
+Timestamp: 2026-09-21T08:00:48.453Z
+------------------------------------------------------------
+------------------------------------------------------------
+[DEV EMAIL SIMULATION] EMAIL VERIFICATION SIMULATION
+To: reviewer-demo@example.com
+Action Link: http://localhost:3000/verify-email?token=abcdef123456
+Timestamp: 2026-09-21T08:07:09.063Z
+------------------------------------------------------------

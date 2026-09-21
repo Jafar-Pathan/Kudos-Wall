@@ -6,6 +6,8 @@ import {
   timingSafeEqual,
 } from "node:crypto";
 import { promisify } from "node:util";
+import fs from "node:fs";
+import path from "node:path";
 import mongoose from "mongoose";
 import { UserModel, RefreshTokenModel, type User } from "./models";
 import { ENV } from "./_core/env";
@@ -56,6 +58,40 @@ function hashRefreshToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
+export function hashToken(token: string) {
+  return createHash("sha256").update(token).digest("hex");
+}
+
+export function logDevEmail(
+  type: "verification" | "password_reset",
+  email: string,
+  link: string,
+) {
+  const title =
+    type === "verification"
+      ? "EMAIL VERIFICATION SIMULATION"
+      : "PASSWORD RESET SIMULATION";
+  const content = [
+    "------------------------------------------------------------",
+    `[DEV EMAIL SIMULATION] ${title}`,
+    `To: ${email}`,
+    `Action Link: ${link}`,
+    `Timestamp: ${new Date().toISOString()}`,
+    "------------------------------------------------------------\n",
+  ].join("\n");
+
+  console.log("\n" + content);
+  try {
+    const docsDir = path.resolve(process.cwd(), "docs");
+    if (!fs.existsSync(docsDir)) {
+      fs.mkdirSync(docsDir, { recursive: true });
+    }
+    fs.appendFileSync(path.join(docsDir, "dev-emails.log"), content, "utf8");
+  } catch (err) {
+    console.error("[DevEmail] Failed to write docs/dev-emails.log:", err);
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  User queries                                                       */
 /* ------------------------------------------------------------------ */
@@ -89,6 +125,11 @@ export async function createCredentialUser(input: {
   const passwordHash = await hashPassword(input.password);
   const openId = `local_${randomUUID()}`;
 
+  // Generate simulated email verification token
+  const rawVerificationToken = randomBytes(32).toString("hex");
+  const verificationTokenHash = hashToken(rawVerificationToken);
+  const verificationTokenExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
   const doc = await UserModel.create({
     openId,
     name: input.name.trim(),
@@ -96,11 +137,117 @@ export async function createCredentialUser(input: {
     passwordHash,
     loginMethod: "password",
     department: input.department ?? "Engineering",
+    emailVerified: false,
+    verificationTokenHash,
+    verificationTokenExpiresAt,
   });
 
   const created = await getUserById(doc._id);
   if (!created) throw new Error("USER_CREATE_FAILED");
+
+  // Simulate outgoing verification email
+  const baseUrl =
+    ENV.googleRedirectUri && !ENV.googleRedirectUri.includes("localhost")
+      ? new URL(ENV.googleRedirectUri).origin
+      : "http://localhost:3000";
+  const verifyLink = `${baseUrl}/verify-email?token=${rawVerificationToken}`;
+  logDevEmail("verification", email, verifyLink);
+
   return created;
+}
+
+export async function verifyEmailToken(token: string) {
+  if (!isDbReady()) throw new Error("DATABASE_UNAVAILABLE");
+  const tokenHash = hashToken(token);
+  const user = await UserModel.findOne({
+    verificationTokenHash: tokenHash,
+    verificationTokenExpiresAt: { $gt: new Date() },
+  }).lean();
+
+  if (!user) throw new Error("INVALID_OR_EXPIRED_TOKEN");
+
+  await UserModel.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        emailVerified: true,
+        verificationTokenHash: null,
+        verificationTokenExpiresAt: null,
+      },
+    },
+  );
+
+  return { email: user.email, name: user.name };
+}
+
+export async function createPasswordReset(rawEmail: string) {
+  if (!isDbReady()) throw new Error("DATABASE_UNAVAILABLE");
+  const email = normalizeEmail(rawEmail);
+  const user = await UserModel.findOne({ email }).lean();
+  if (!user) {
+    // Avoid email enumeration; silently return success
+    return true;
+  }
+
+  const rawResetToken = randomBytes(32).toString("hex");
+  const resetPasswordTokenHash = hashToken(rawResetToken);
+  const resetPasswordTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+  await UserModel.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        resetPasswordTokenHash,
+        resetPasswordTokenExpiresAt,
+      },
+    },
+  );
+
+  const baseUrl =
+    ENV.googleRedirectUri && !ENV.googleRedirectUri.includes("localhost")
+      ? new URL(ENV.googleRedirectUri).origin
+      : "http://localhost:3000";
+  const resetLink = `${baseUrl}/reset-password?token=${rawResetToken}`;
+  logDevEmail("password_reset", email, resetLink);
+
+  return true;
+}
+
+export async function resetPasswordWithToken(
+  token: string,
+  newPassword: string,
+) {
+  if (!isDbReady()) throw new Error("DATABASE_UNAVAILABLE");
+  const tokenHash = hashToken(token);
+  const user = await UserModel.findOne({
+    resetPasswordTokenHash: tokenHash,
+    resetPasswordTokenExpiresAt: { $gt: new Date() },
+  }).lean();
+
+  if (!user) throw new Error("INVALID_OR_EXPIRED_TOKEN");
+
+  validatePassword(newPassword);
+  const passwordHash = await hashPassword(newPassword);
+
+  await UserModel.updateOne(
+    { _id: user._id },
+    {
+      $set: {
+        passwordHash,
+        loginMethod: "password",
+        resetPasswordTokenHash: null,
+        resetPasswordTokenExpiresAt: null,
+      },
+    },
+  );
+
+  // Revoke all existing refresh tokens to force re-login
+  await RefreshTokenModel.updateMany(
+    { userId: user._id, revokedAt: null },
+    { $set: { revokedAt: new Date() } },
+  );
+
+  return true;
 }
 
 export async function updateUserProfile(input: {

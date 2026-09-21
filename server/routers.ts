@@ -8,12 +8,15 @@ import {
   authConfig,
   changeUserPassword,
   createCredentialUser,
+  createPasswordReset,
   getUserByEmail,
   issueAuthTokens,
   markUserSignedIn,
+  resetPasswordWithToken,
   revokeRefreshToken,
   rotateRefreshToken,
   updateUserProfile,
+  verifyEmailToken,
   verifyPassword,
 } from "./auth";
 import {
@@ -122,6 +125,76 @@ export const appRouter = router({
       ctx.res.clearCookie(authConfig.refreshCookieName, { ...getSessionCookieOptions(ctx.req), maxAge: 0 });
       return { success: true } as const;
     }),
+    verifyEmail: publicProcedure
+      .input(z.object({ token: z.string().min(1) }))
+      .mutation(async ({ input }) => {
+        try {
+          const result = await verifyEmailToken(input.token);
+          return { success: true, email: result.email, name: result.name };
+        } catch {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Email verification link is invalid or has expired.",
+          });
+        }
+      }),
+    forgotPassword: publicProcedure
+      .input(z.object({ email: z.string().trim().email() }))
+      .mutation(async ({ input }) => {
+        try {
+          await createPasswordReset(input.email);
+          return {
+            success: true,
+            message:
+              "If an account exists with that email, a password reset link has been dispatched.",
+          };
+        } catch {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Failed to process password reset request.",
+          });
+        }
+      }),
+    resetPassword: publicProcedure
+      .input(
+        z.object({
+          token: z.string().min(1),
+          newPassword: z.string().min(8).max(128),
+        }),
+      )
+      .mutation(async ({ input }) => {
+        try {
+          await resetPasswordWithToken(input.token, input.newPassword);
+          return {
+            success: true,
+            message: "Your password has been updated. Please sign in with your new password.",
+          };
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            error.message === "PASSWORD_COMPLEXITY"
+          ) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message:
+                "Password must contain at least one letter and one number.",
+            });
+          }
+          if (
+            error instanceof Error &&
+            error.message === "PASSWORD_TOO_SHORT"
+          ) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Password must be at least 8 characters.",
+            });
+          }
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Password reset link is invalid or has expired.",
+          });
+        }
+      }),
   }),
   kudos: router({
     overview: publicProcedure.query(async ({ ctx }) => {

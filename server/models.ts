@@ -17,6 +17,11 @@ export interface User {
   avatar: string | null;
   givingAllowance: number;
   earnedPoints: number;
+  emailVerified: boolean;
+  verificationTokenHash?: string | null;
+  verificationTokenExpiresAt?: Date | null;
+  resetPasswordTokenHash?: string | null;
+  resetPasswordTokenExpiresAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
   lastSignedIn: Date;
@@ -33,6 +38,11 @@ export interface InsertUser {
   avatar?: string | null;
   givingAllowance?: number;
   earnedPoints?: number;
+  emailVerified?: boolean;
+  verificationTokenHash?: string | null;
+  verificationTokenExpiresAt?: Date | null;
+  resetPasswordTokenHash?: string | null;
+  resetPasswordTokenExpiresAt?: Date | null;
   lastSignedIn?: Date;
 }
 
@@ -100,6 +110,11 @@ const userSchema = new Schema(
     avatar: { type: String, default: null },
     givingAllowance: { type: Number, default: 100, required: true },
     earnedPoints: { type: Number, default: 0, required: true },
+    emailVerified: { type: Boolean, default: false },
+    verificationTokenHash: { type: String, default: null },
+    verificationTokenExpiresAt: { type: Date, default: null },
+    resetPasswordTokenHash: { type: String, default: null },
+    resetPasswordTokenExpiresAt: { type: Date, default: null },
     lastSignedIn: { type: Date, default: Date.now, required: true },
   },
   {
