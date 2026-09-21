@@ -285,15 +285,24 @@ export async function getProfileStats(userId: string) {
   const oid = new mongoose.Types.ObjectId(userId);
   const sent = await KudosModel.countDocuments({ senderId: oid });
   const received = await KudosModel.countDocuments({ recipientId: oid });
+  const badges: string[] = [];
+  if (received >= 1 || sent >= 1) {
+    badges.push("First High-Five");
+  }
+  if (sent >= 3) {
+    badges.push("Generous Teammate");
+  }
+  if (received >= 3) {
+    badges.push("Rising Star");
+  }
+  if (received >= 5) {
+    badges.push("Culture Carrier");
+  }
+
   return {
     sent,
     received,
-    badges:
-      received >= 5
-        ? ["Culture Carrier"]
-        : received >= 3
-          ? ["Rising Star"]
-          : [],
+    badges,
   };
 }
 
