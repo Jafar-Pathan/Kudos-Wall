@@ -1,0 +1,25 @@
+# Copy this file to .env for a self-hosted local run.
+# Required for authentication and database.
+DATABASE_URL=mongodb+srv://<username>:<password>@cluster0.example.mongodb.net/kudos_wall?appName=Cluster0
+JWT_SECRET=replace-with-a-long-random-secret
+
+# Runtime
+NODE_ENV=development
+PORT=3000
+
+# Google OAuth 2.0 configuration
+# Credentials from Google Cloud Console: https://console.cloud.google.com/apis/credentials
+GOOGLE_CLIENT_ID=your-google-client-id.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/oauth/callback
+OWNER_OPEN_ID=owner-open-id
+BUILT_IN_FORGE_API_URL=https://forge.example.invalid
+BUILT_IN_FORGE_API_KEY=replace-with-forge-key
+
+# Optional browser map helper.
+VITE_FRONTEND_FORGE_API_URL=https://forge.example.invalid
+VITE_FRONTEND_FORGE_API_KEY=replace-with-frontend-forge-key
+
+# Optional analytics placeholders referenced by client/index.html.
+VITE_ANALYTICS_ENDPOINT=https://analytics.example.invalid
+VITE_ANALYTICS_WEBSITE_ID=replace-with-analytics-site-id

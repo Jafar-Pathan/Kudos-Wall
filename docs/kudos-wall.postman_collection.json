@@ -1,0 +1,748 @@
+{
+  "info": {
+    "_postman_id": "9e3e8c2e-4b44-4c6a-8b2a-7f6f10c9f13c",
+    "name": "Kudos Wall API",
+    "description": "Postman collection for the Kudos Wall Express + tRPC API. Email/password auth returns a short-lived access JWT and sets a seven-day rotating refresh token in the HTTP-only kudos_refresh_token cookie.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "type": "string"
+    },
+    {
+      "key": "accessToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refreshToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "kudosId",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "recipientId",
+      "value": "2",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Sign up",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Avery Morgan\",\n  \"email\": \"avery@example.com\",\n  \"password\": \"teamwork123\",\n  \"department\": \"Engineering\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/auth.signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "auth.signup"
+              ]
+            },
+            "description": "Public procedure. Password must be at least 8 characters and contain at least one letter and one number. Success sets the HTTP-only kudos_refresh_token cookie and returns a 15-minute accessToken. Store the accessToken in the {{accessToken}} collection variable for protected requests."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": {\n    \"data\": {\n      \"json\": {\n        \"user\": { \"id\": 42, \"name\": \"Avery Morgan\", \"email\": \"avery@example.com\", \"role\": \"user\", \"department\": \"Engineering\" },\n        \"accessToken\": \"eyJ...\",\n        \"expiresIn\": 900\n      }\n    }\n  }\n}"
+            },
+            {
+              "name": "Duplicate email",
+              "originalRequest": {},
+              "status": "Conflict",
+              "code": 409,
+              "body": "{\n  \"error\": { \"json\": { \"message\": \"An account with that email already exists.\", \"data\": { \"code\": \"CONFLICT\" } } }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Sign in",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"avery@example.com\",\n  \"password\": \"teamwork123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/auth.signin",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "auth.signin"
+              ]
+            },
+            "description": "Public procedure. Success sets/replaces the HTTP-only refresh cookie and returns a new 15-minute access JWT. Invalid credentials return a generic 401 response."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": {\n    \"data\": {\n      \"json\": {\n        \"user\": { \"id\": 42, \"name\": \"Avery Morgan\", \"email\": \"avery@example.com\" },\n        \"accessToken\": \"eyJ...\",\n        \"expiresIn\": 900\n      }\n    }\n  }\n}"
+            },
+            {
+              "name": "Invalid credentials",
+              "originalRequest": {},
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"error\": { \"json\": { \"message\": \"Email or password is incorrect.\", \"data\": { \"code\": \"UNAUTHORIZED\" } } }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Refresh access token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "kudos_refresh_token={{refreshToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/auth.refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "auth.refresh"
+              ]
+            },
+            "description": "Public procedure, but requires the refresh cookie. The presented refresh token is revoked and replaced, preventing reuse. Update {{accessToken}} and {{refreshToken}} from the response Set-Cookie/header values in a real client."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": {\n    \"data\": { \"json\": { \"user\": { \"id\": 42 }, \"accessToken\": \"eyJ...\", \"expiresIn\": 900 } }\n  }\n}"
+            },
+            {
+              "name": "Expired refresh token",
+              "originalRequest": {},
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"error\": { \"json\": { \"message\": \"Refresh token is invalid or expired.\", \"data\": { \"code\": \"UNAUTHORIZED\" } } }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get current user",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/auth.me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "auth.me"
+              ]
+            },
+            "description": "Requires a valid access JWT. Returns a sanitized user object without passwordHash or openId."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": { \"data\": { \"json\": { \"id\": 42, \"name\": \"Avery Morgan\", \"email\": \"avery@example.com\", \"role\": \"user\" } } }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Cookie",
+                "value": "kudos_refresh_token={{refreshToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/auth.logout",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "auth.logout"
+              ]
+            },
+            "description": "Revokes the current refresh token and clears the HTTP-only refresh cookie. The access JWT remains cryptographically valid until its short expiry, so clients should discard it immediately."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": { \"data\": { \"json\": { \"success\": true } } }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Kudos",
+      "item": [
+        {
+          "name": "Get overview",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/kudos.overview",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "kudos.overview"
+              ]
+            },
+            "description": "Public read model for allowance and recognition summary."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": { \"data\": { \"json\": { \"allowance\": 72, \"received\": 14, \"sent\": 8 } } }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Give kudos (protected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientId\": {{recipientId}},\n  \"points\": 20,\n  \"message\": \"Thank you for making the launch feel easy and focused.\",\n  \"tags\": [\"#Teamwork\", \"#Innovation\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/kudos.give",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "kudos.give"
+              ]
+            },
+            "description": "Requires Authorization: Bearer <accessToken>. Points must be exactly 10, 20, or 50; message length is 8\u2013280 characters; tags must contain 1\u20133 supported values."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": { \"data\": { \"json\": { \"id\": 42, \"recipientName\": \"Maya Patel\" } } }\n}"
+            },
+            {
+              "name": "Unauthorized",
+              "originalRequest": {},
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"error\": { \"json\": { \"message\": \"Please login (10001)\", \"data\": { \"code\": \"UNAUTHORIZED\" } } }\n}"
+            }
+          ]
+        },
+        {
+          "name": "React to kudos (protected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kudosId\": {{kudosId}},\n  \"reaction\": \"fire\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/kudos.react",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "kudos.react"
+              ]
+            },
+            "description": "Requires a valid access JWT. Reaction must be thumbs, party, or fire."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": { \"data\": { \"json\": { \"fire\": 8, \"thumbs\": 12, \"party\": 4 } } }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Feed",
+      "item": [
+        {
+          "name": "List feed",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/kudos.feed?input=%7B%22json%22%3A%7B%22limit%22%3A10%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "kudos.feed"
+              ],
+              "query": [
+                {
+                  "key": "input",
+                  "value": "{\"json\":{\"limit\":10}}"
+                }
+              ]
+            },
+            "description": "Public cursor-compatible feed. Add cursor and/or search to the JSON input."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": { \"data\": { \"json\": { \"rows\": [], \"nextCursor\": 0 } } }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Search teammates",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/kudos.searchUsers?input=%7B%22json%22%3A%7B%22query%22%3A%22maya%22%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "kudos.searchUsers"
+              ],
+              "query": [
+                {
+                  "key": "input",
+                  "value": "{\"json\":{\"query\":\"maya\"}}"
+                }
+              ]
+            },
+            "description": "Public recipient search. Use excludeId to omit the current sender."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": { \"data\": { \"json\": [{ \"id\": 101, \"name\": \"Maya Patel\", \"department\": \"Design\" }] } }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Leaderboard",
+      "item": [
+        {
+          "name": "List leaderboard",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/leaderboard.list?input=%7B%22json%22%3A%7B%22department%22%3A%22Engineering%22%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "leaderboard.list"
+              ],
+              "query": [
+                {
+                  "key": "input",
+                  "value": "{\"json\":{\"department\":\"Engineering\"}}"
+                }
+              ]
+            },
+            "description": "Public leaderboard. Omit department or use Engineering, Design, Marketing, or Sales."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": { \"data\": { \"json\": [{ \"id\": 105, \"name\": \"Priya Nair\", \"department\": \"Engineering\", \"earnedPoints\": 365 }] } }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Profile and Admin",
+      "item": [
+        {
+          "name": "Change password (protected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"teamwork123\",\n  \"newPassword\": \"stronger456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/profile.changePassword",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "profile.changePassword"
+              ]
+            },
+            "description": "Requires a valid access JWT and the current password. New password must be at least 8 characters with one letter and one number."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": { \"data\": { \"json\": { \"success\": true } } }\n}"
+            },
+            {
+              "name": "Wrong current password",
+              "originalRequest": {},
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"error\": { \"json\": { \"message\": \"Your current password is incorrect.\", \"data\": { \"code\": \"BAD_REQUEST\" } } }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update account details (protected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Avery Morgan\",\n  \"email\": \"avery@example.com\",\n  \"department\": \"Design\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/profile.update",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "profile.update"
+              ]
+            },
+            "description": "Requires a valid access JWT. Updates the signed-in user name, unique email, and department."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": { \"data\": { \"json\": { \"id\": 42, \"name\": \"Avery Morgan\", \"email\": \"avery@example.com\", \"department\": \"Design\" } } }\n}"
+            },
+            {
+              "name": "Email already used",
+              "originalRequest": {},
+              "status": "Conflict",
+              "code": 409,
+              "body": "{\n  \"error\": { \"json\": { \"message\": \"That email is already in use.\", \"data\": { \"code\": \"CONFLICT\" } } }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get my profile (protected)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/profile.me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "profile.me"
+              ]
+            },
+            "description": "Requires a valid access JWT."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": { \"data\": { \"json\": { \"allowance\": 72, \"earnedPoints\": 420, \"stats\": { \"sent\": 8, \"received\": 12, \"badges\": [\"Culture Carrier\"] } } } }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Reset allowances (admin protected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/admin.resetAllowances",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "admin.resetAllowances"
+              ]
+            },
+            "description": "Requires a valid access JWT for a database user whose role is admin."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": { \"data\": { \"json\": { \"updated\": 5 } } }\n}"
+            },
+            {
+              "name": "Forbidden",
+              "originalRequest": {},
+              "status": "Forbidden",
+              "code": 403,
+              "body": "{\n  \"error\": { \"json\": { \"message\": \"Admin access required.\", \"data\": { \"code\": \"FORBIDDEN\" } } }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "System",
+      "item": [
+        {
+          "name": "Health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/system.health?input=%7B%22json%22%3A%7B%22timestamp%22%3A0%7D%7D",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "system.health"
+              ],
+              "query": [
+                {
+                  "key": "input",
+                  "value": "{\"json\":{\"timestamp\":0}}"
+                }
+              ]
+            },
+            "description": "Public health procedure."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": { \"data\": { \"json\": { \"ok\": true } } }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Notify owner (admin protected)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Kudos Wall test\",\n  \"content\": \"This is an admin-only notification test.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/trpc/system.notifyOwner",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "trpc",
+                "system.notifyOwner"
+              ]
+            },
+            "description": "Requires a valid access JWT and an admin database role."
+          },
+          "response": [
+            {
+              "name": "Success",
+              "originalRequest": {},
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"result\": { \"data\": { \"json\": { \"success\": true } } }\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
