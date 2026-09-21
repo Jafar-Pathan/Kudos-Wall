@@ -10,3 +10,15 @@ To: reviewer-demo@example.com
 Action Link: http://localhost:3000/verify-email?token=abcdef123456
 Timestamp: 2026-09-21T08:07:09.063Z
 ------------------------------------------------------------
+------------------------------------------------------------
+[DEV EMAIL SIMULATION] EMAIL VERIFICATION SIMULATION
+To: audit-1789978557907@northstar.co
+Action Link: http://localhost:3000/verify-email?token=ad0a8332179675df255dff54a603bcfa9748471fc4c76ca2a26fd05eb1781787
+Timestamp: 2026-09-21T08:15:59.528Z
+------------------------------------------------------------
+------------------------------------------------------------
+[DEV EMAIL SIMULATION] PASSWORD RESET SIMULATION
+To: audit-1789978557907@northstar.co
+Action Link: http://localhost:3000/reset-password?token=22296b234ef483ba98c17bd1b2efae85df114c0070671960ae9397cd7669e2bd
+Timestamp: 2026-09-21T08:16:00.980Z
+------------------------------------------------------------
