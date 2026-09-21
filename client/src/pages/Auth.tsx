@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 const departments = ["Engineering", "Design", "Marketing", "Sales"] as const;
 
-type Mode = "signin" | "signup";
+type Mode = "signin" | "signup" | "forgot";
 
 function GoogleIcon({ className = "size-4" }: { className?: string }) {
   return (
@@ -42,9 +42,11 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [department, setDepartment] = useState<(typeof departments)[number]>("Engineering");
   const [showPassword, setShowPassword] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
   const signin = trpc.auth.signin.useMutation();
   const signup = trpc.auth.signup.useMutation();
-  const mutation = mode === "signin" ? signin : signup;
+  const forgotPassword = trpc.auth.forgotPassword.useMutation();
+  const mutation = mode === "signin" ? signin : mode === "signup" ? signup : forgotPassword;
 
   // Handle URL errors from OAuth redirect
   useEffect(() => {
@@ -68,6 +70,17 @@ export default function Auth() {
   const utils = trpc.useUtils();
   const submit = async (event: FormEvent) => {
     event.preventDefault();
+    if (mode === "forgot") {
+      try {
+        await forgotPassword.mutateAsync({ email });
+        setForgotSent(true);
+        toast.success("Password reset simulated! Check docs/dev-emails.log or terminal.");
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Failed to request reset link.");
+      }
+      return;
+    }
+
     try {
       const result = mode === "signin"
         ? await signin.mutateAsync({ email, password })
@@ -77,7 +90,11 @@ export default function Auth() {
       void utils.kudos.invalidate();
       void utils.leaderboard.invalidate();
       void utils.profile.invalidate();
-      toast.success(mode === "signin" ? "Welcome back to Kudos Wall." : "Your Kudos Wall account is ready.");
+      if (mode === "signup") {
+        toast.success("Account created! Verification email simulated in docs/dev-emails.log");
+      } else {
+        toast.success("Welcome back to Kudos Wall.");
+      }
       navigate("/");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Authentication failed. Please try again.");
@@ -86,8 +103,10 @@ export default function Auth() {
 
   const switchMode = (next: Mode) => {
     setMode(next);
+    setForgotSent(false);
     signin.reset();
     signup.reset();
+    forgotPassword.reset();
   };
 
   const handleGoogleSignIn = () => {
@@ -127,47 +146,226 @@ export default function Auth() {
             </div>
             <div className="mb-8">
               <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-coral">Workspace access</p>
-              <h2 className="mt-3 font-display text-4xl font-bold tracking-tight">{mode === "signin" ? "Welcome back." : "Join the culture loop."}</h2>
-              <p className="mt-2 text-sm leading-6 text-ink/50">{mode === "signin" ? "Sign in to give kudos, celebrate teammates, and see your recognition story." : "Create your teammate profile and start recognizing the work that matters."}</p>
+              <h2 className="mt-3 font-display text-4xl font-bold tracking-tight">
+                {mode === "signin"
+                  ? "Welcome back."
+                  : mode === "signup"
+                    ? "Join the culture loop."
+                    : "Reset your password."}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-ink/50">
+                {mode === "signin"
+                  ? "Sign in to give kudos, celebrate teammates, and see your recognition story."
+                  : mode === "signup"
+                    ? "Create your teammate profile and start recognizing the work that matters."
+                    : "Enter your work email address to receive a simulated password reset link."}
+              </p>
             </div>
 
-            {/* Google OAuth 2.0 Button */}
-            <div className="mb-6">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleGoogleSignIn}
-                className="h-12 w-full gap-3 rounded-xl border-ink/15 bg-white text-sm font-bold text-ink shadow-sm transition hover:bg-ink/5 hover:border-ink/25"
-              >
-                <GoogleIcon className="size-5" />
-                Continue with Google
-              </Button>
+            {mode !== "forgot" && (
+              <>
+                {/* Google OAuth 2.0 Button */}
+                <div className="mb-6">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleGoogleSignIn}
+                    className="h-12 w-full gap-3 rounded-xl border-ink/15 bg-white text-sm font-bold text-ink shadow-sm transition hover:bg-ink/5 hover:border-ink/25"
+                  >
+                    <GoogleIcon className="size-5" />
+                    Continue with Google
+                  </Button>
 
-              <div className="relative my-6">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t border-ink/10" />
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t border-ink/10" />
+                    </div>
+                    <div className="relative flex justify-center text-xs">
+                      <span className="bg-paper px-3 text-[11px] font-semibold text-ink/40">
+                        or continue with work email
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div className="relative flex justify-center text-xs">
-                  <span className="bg-paper px-3 text-[11px] font-semibold text-ink/40">
-                    or continue with work email
-                  </span>
+
+                <div className="mb-6 grid grid-cols-2 rounded-xl bg-ink/5 p-1">
+                  <button
+                    type="button"
+                    onClick={() => switchMode("signin")}
+                    className={`rounded-lg px-4 py-2.5 text-xs font-bold transition ${mode === "signin" ? "bg-white text-ink shadow-sm" : "text-ink/45"}`}
+                  >
+                    Sign in
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => switchMode("signup")}
+                    className={`rounded-lg px-4 py-2.5 text-xs font-bold transition ${mode === "signup" ? "bg-white text-ink shadow-sm" : "text-ink/45"}`}
+                  >
+                    Create account
+                  </button>
                 </div>
+              </>
+            )}
+
+            {mode === "forgot" && forgotSent ? (
+              <div className="rounded-2xl border border-ink/10 bg-white p-6 text-center space-y-4 shadow-sm">
+                <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-mint text-ink">
+                  <Check className="size-6" />
+                </div>
+                <h3 className="font-display text-xl font-bold">Reset link generated</h3>
+                <p className="text-xs text-ink/60 leading-5">
+                  A simulated password reset link was dispatched. You can find and click the link in{" "}
+                  <code className="bg-paper px-1.5 py-0.5 rounded text-xs font-mono text-coral">docs/dev-emails.log</code> or your server terminal console.
+                </p>
+                <Button
+                  type="button"
+                  onClick={() => switchMode("signin")}
+                  className="w-full rounded-xl bg-ink text-paper hover:bg-ink/90"
+                >
+                  Back to Sign in
+                </Button>
               </div>
-            </div>
-
-            <div className="mb-6 grid grid-cols-2 rounded-xl bg-ink/5 p-1">
-              <button type="button" onClick={() => switchMode("signin")} className={`rounded-lg px-4 py-2.5 text-xs font-bold transition ${mode === "signin" ? "bg-white text-ink shadow-sm" : "text-ink/45"}`}>Sign in</button>
-              <button type="button" onClick={() => switchMode("signup")} className={`rounded-lg px-4 py-2.5 text-xs font-bold transition ${mode === "signup" ? "bg-white text-ink shadow-sm" : "text-ink/45"}`}>Create account</button>
-            </div>
-
-            <form onSubmit={submit} className="space-y-4">
-              {mode === "signup" && <div><label htmlFor="name" className="mb-2 block text-xs font-bold text-ink/60">Full name</label><Input id="name" autoComplete="name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Your name" required className="h-12 rounded-xl border-ink/15 bg-white" /></div>}
-              <div><label htmlFor="email" className="mb-2 block text-xs font-bold text-ink/60">Work email</label><Input id="email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="you@company.com" required className="h-12 rounded-xl border-ink/15 bg-white" /></div>
-              <div><label htmlFor="password" className="mb-2 block text-xs font-bold text-ink/60">Password</label><div className="relative"><Input id="password" type={showPassword ? "text" : "password"} autoComplete={mode === "signin" ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="At least 8 characters" required minLength={8} className="h-12 rounded-xl border-ink/15 bg-white pr-11" /><button type="button" aria-label={showPassword ? "Hide password" : "Show password"} onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/35 hover:text-ink">{showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}</button></div>{mode === "signup" && <p className="mt-2 text-[11px] text-ink/40">Use at least 8 characters with one letter and one number.</p>}</div>
-              {mode === "signup" && <div><label htmlFor="department" className="mb-2 block text-xs font-bold text-ink/60">Department</label><select id="department" value={department} onChange={(event) => setDepartment(event.target.value as (typeof departments)[number])} className="h-12 w-full rounded-xl border border-ink/15 bg-white px-3 text-sm outline-none focus:border-coral focus:ring-2 focus:ring-coral/20">{departments.map((item) => <option key={item} value={item}>{item}</option>)}</select></div>}
-              <Button type="submit" disabled={mutation.isPending} aria-busy={mutation.isPending} className="mt-2 h-12 w-full rounded-xl bg-ink text-paper hover:bg-ink/90">{mutation.isPending ? <Loader2 className="animate-spin" /> : <LockKeyhole className="size-4" />}{mutation.isPending ? (mode === "signin" ? "Signing in..." : "Creating account...") : (mode === "signin" ? "Sign in securely" : "Create my account")}</Button>
-              <p aria-live="polite" className="min-h-4 text-center text-[11px] text-ink/45">{mutation.isPending ? (mode === "signin" ? "Checking your workspace credentials..." : "Securing your new account...") : ""}</p>
-            </form>
+            ) : (
+              <form onSubmit={submit} className="space-y-4">
+                {mode === "signup" && (
+                  <div>
+                    <label htmlFor="name" className="mb-2 block text-xs font-bold text-ink/60">
+                      Full name
+                    </label>
+                    <Input
+                      id="name"
+                      autoComplete="name"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      placeholder="Your name"
+                      required
+                      className="h-12 rounded-xl border-ink/15 bg-white"
+                    />
+                  </div>
+                )}
+                <div>
+                  <label htmlFor="email" className="mb-2 block text-xs font-bold text-ink/60">
+                    Work email
+                  </label>
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    placeholder="you@company.com"
+                    required
+                    className="h-12 rounded-xl border-ink/15 bg-white"
+                  />
+                </div>
+                {mode !== "forgot" && (
+                  <div>
+                    <div className="mb-2 flex items-center justify-between">
+                      <label htmlFor="password" className="text-xs font-bold text-ink/60">
+                        Password
+                      </label>
+                      {mode === "signin" && (
+                        <button
+                          type="button"
+                          onClick={() => switchMode("forgot")}
+                          className="text-xs font-semibold text-coral hover:underline"
+                        >
+                          Forgot password?
+                        </button>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        autoComplete={mode === "signin" ? "current-password" : "new-password"}
+                        value={password}
+                        onChange={(event) => setPassword(event.target.value)}
+                        placeholder="At least 8 characters"
+                        required
+                        minLength={8}
+                        className="h-12 rounded-xl border-ink/15 bg-white pr-11"
+                      />
+                      <button
+                        type="button"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        onClick={() => setShowPassword((value) => !value)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-ink/35 hover:text-ink"
+                      >
+                        {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                      </button>
+                    </div>
+                    {mode === "signup" && (
+                      <p className="mt-2 text-[11px] text-ink/40">
+                        Use at least 8 characters with one letter and one number.
+                      </p>
+                    )}
+                  </div>
+                )}
+                {mode === "signup" && (
+                  <div>
+                    <label htmlFor="department" className="mb-2 block text-xs font-bold text-ink/60">
+                      Department
+                    </label>
+                    <select
+                      id="department"
+                      value={department}
+                      onChange={(event) => setDepartment(event.target.value as (typeof departments)[number])}
+                      className="h-12 w-full rounded-xl border border-ink/15 bg-white px-3 text-sm outline-none focus:border-coral focus:ring-2 focus:ring-coral/20"
+                    >
+                      {departments.map((item) => (
+                        <option key={item} value={item}>
+                          {item}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <Button
+                  type="submit"
+                  disabled={mutation.isPending}
+                  aria-busy={mutation.isPending}
+                  className="mt-2 h-12 w-full rounded-xl bg-ink text-paper hover:bg-ink/90"
+                >
+                  {mutation.isPending ? (
+                    <Loader2 className="animate-spin" />
+                  ) : (
+                    <LockKeyhole className="size-4" />
+                  )}
+                  {mutation.isPending
+                    ? mode === "signin"
+                      ? "Signing in..."
+                      : mode === "signup"
+                        ? "Creating account..."
+                        : "Sending reset link..."
+                    : mode === "signin"
+                      ? "Sign in securely"
+                      : mode === "signup"
+                        ? "Create my account"
+                        : "Send reset link"}
+                </Button>
+                {mode === "forgot" && (
+                  <div className="text-center pt-2">
+                    <button
+                      type="button"
+                      onClick={() => switchMode("signin")}
+                      className="text-xs font-semibold text-ink/50 hover:text-ink hover:underline"
+                    >
+                      Cancel and back to sign in
+                    </button>
+                  </div>
+                )}
+                <p aria-live="polite" className="min-h-4 text-center text-[11px] text-ink/45">
+                  {mutation.isPending
+                    ? mode === "signin"
+                      ? "Checking your workspace credentials..."
+                      : mode === "signup"
+                        ? "Securing your new account..."
+                        : "Generating simulation reset link..."
+                    : ""}
+                </p>
+              </form>
+            )}
             <p className="mt-6 text-center text-xs text-ink/40">By continuing, you agree to use Kudos Wall for internal team recognition.</p>
           </div>
         </section>
